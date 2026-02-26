@@ -183,6 +183,12 @@ function jumpToSearch(title, sec) {
 }
 
 // 綁定事件
+document.getElementById('search-input').addEventListener('keydown', function(event) {
+    // 當按下的是 Enter 鍵時 (Key Code 13)
+    if (event.key === 'Enter') {
+        handleSearch();
+    }
+});
 document.getElementById('reset-trigger').onclick = resetToInitial;
 document.getElementById('search-btn').onclick = handleSearch;
 btnPrev.onclick = () => changePage(-1);

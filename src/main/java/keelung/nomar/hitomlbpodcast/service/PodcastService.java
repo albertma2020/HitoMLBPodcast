@@ -90,27 +90,55 @@ public class PodcastService {
         List<Chapter> chapters = new ArrayList<>();
         if (html == null) return chapters;
 
+        // 1. 基本清理 HTML
         String cleanText = html.replaceAll("<br\\s*/?>", "\n")
                 .replaceAll("<[^>]*>", " ")
                 .replaceAll("&nbsp;", " ");
 
-        String[] segments = cleanText.split("[\\n\\r、，。；;]");
+        // 2. 智慧過濾：嘗試多種錨點
+        String sponsorLink = "www.zeczec.com/projects/hitomlb";
+        String topicAnchor = "本集討論";
+
+        int sponsorIndex = cleanText.indexOf(sponsorLink);
+        int topicIndex = cleanText.indexOf(topicAnchor);
+
+        // 優先從贊助連結後開始解析；若無贊助則看是否有「本集討論」；皆無則從頭開始
+        int startIndex = 0;
+        if (sponsorIndex != -1) {
+            startIndex = sponsorIndex + sponsorLink.length();
+        } else if (topicIndex != -1) {
+            startIndex = topicIndex;
+        }
+
+        String targetText = cleanText.substring(startIndex);
+
+        // 3. 使用正則表達式尋找時間戳
         Pattern timePattern = Pattern.compile("\\(((\\d{1,2}:)?\\d{1,2}:\\d{2})\\)");
+        Matcher m = timePattern.matcher(targetText);
 
-        for (String seg : segments) {
-            Matcher m = timePattern.matcher(seg);
-            if (m.find()) {
-                String timestamp = m.group(1);
-                String title = seg.substring(0, m.start()).trim();
+        int lastMatchPos = 0;
+        while (m.find()) {
+            String timestamp = m.group(1);
 
-                if (title.contains("本集討論")) {
-                    title = title.substring(title.indexOf("本集討論")).trim();
-                }
+            // 擷取標題
+            String rawTitle = targetText.substring(lastMatchPos, m.start());
 
-                if (title.length() > 2 && !title.startsWith("http")) {
-                    chapters.add(new Chapter(title, timestamp, timeToSeconds(timestamp)));
-                }
+            // 清理標題文字
+            String title = rawTitle.replace("\n", " ").trim();
+
+            // 再次檢查並移除「本集討論」前綴
+            if (title.contains(topicAnchor)) {
+                title = title.substring(title.indexOf(topicAnchor) + topicAnchor.length()).trim();
             }
+
+            // 移除開頭所有標點符號與空白
+            title = title.replaceAll("^[，。、；;：:：\\s]+", "").trim();
+
+            if (title.length() > 1 && !title.startsWith("http")) {
+                chapters.add(new Chapter(title, timestamp, timeToSeconds(timestamp)));
+            }
+
+            lastMatchPos = m.end();
         }
         return chapters;
     }

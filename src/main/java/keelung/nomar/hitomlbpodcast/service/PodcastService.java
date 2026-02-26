@@ -11,8 +11,8 @@ import org.springframework.stereotype.Service;
 
 import java.net.URL;
 import java.net.URLConnection;
-import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,39 +27,41 @@ public class PodcastService {
             URLConnection conn = new URL(RSS_URL).openConnection();
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0");
 
-            SyndFeed feed = new SyndFeedInput().build(new XmlReader(conn));
-
-            // 固定日期格式與 UTC 時區，確保與 RSS 原文日期一致
-            SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy (EEE)", Locale.ENGLISH);
-            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+            SyndFeedInput input = new SyndFeedInput();
+            SyndFeed feed = input.build(new XmlReader(conn));
 
             for (SyndEntry entry : feed.getEntries()) {
                 String title = entry.getTitle();
-                if (title == null || !title.trim().startsWith("Hito 大聯盟 第")) {
-                    continue;
-                }
+                if (title == null || !title.trim().startsWith("Hito 大聯盟 第")) continue;
 
                 Episode ep = new Episode();
                 ep.setTitle(title);
                 ep.setLink(entry.getLink());
-                ep.setPubDate(entry.getPublishedDate() != null ? sdf.format(entry.getPublishedDate()) : "");
 
+                String rawHtml = (entry.getDescription() != null) ? entry.getDescription().getValue() : "";
+                ep.setFullDescription(rawHtml);
+
+                // --- 核心修正：如實抓取日期 ---
+                String capturedDate = extractRawDate(rawHtml);
+                if (capturedDate.isEmpty() && entry.getPublishedDate() != null) {
+                    // 備案：若沒抓到文字標籤，才用標準日期（轉為簡單字串避免偏移）
+                    capturedDate = entry.getPublishedDate().toString();
+                }
+                ep.setPubDate(capturedDate);
+
+                // 處理時長與音軌
                 if (entry.getEnclosures() != null && !entry.getEnclosures().isEmpty()) {
                     ep.setAudioUrl(entry.getEnclosures().get(0).getUrl());
                 }
 
-                // 處理總時長
                 String rawDuration = "";
-                for (Element el : entry.getForeignMarkup()) {
-                    if ("duration".equals(el.getName())) {
+                for (Object obj : entry.getForeignMarkup()) {
+                    if (obj instanceof Element el && "duration".equals(el.getName())) {
                         rawDuration = el.getText();
                         break;
                     }
                 }
                 ep.setDuration(formatDuration(rawDuration));
-
-                String rawHtml = entry.getDescription() != null ? entry.getDescription().getValue() : "";
-                ep.setFullDescription(rawHtml);
                 ep.setChapters(parseChapters(rawHtml));
                 episodes.add(ep);
             }
@@ -69,75 +71,58 @@ public class PodcastService {
         return episodes;
     }
 
+    private String extractRawDate(String html) {
+        if (html == null) return "";
+        // 修正正則：忽略 HTML 標籤與多餘空白，精準鎖定 Published on: 後的日期
+        Pattern pattern = Pattern.compile("Published on:\\s*([^<\\n|]+)");
+        Matcher matcher = pattern.matcher(html);
+        if (matcher.find()) {
+            return matcher.group(1).trim();
+        }
+        return "";
+    }
+
     private String formatDuration(String raw) {
         if (raw == null || raw.isEmpty()) return "00:00:00";
-        if (raw.matches("\\d+")) {
-            int totalSec = Integer.parseInt(raw);
-            return String.format("%02d:%02d:%02d", totalSec / 3600, (totalSec % 3600) / 60, totalSec % 60);
+        try {
+            if (raw.contains(":")) {
+                String[] p = raw.split(":");
+                int h = 0, m = 0, s = 0;
+                if (p.length == 3) {
+                    h = Integer.parseInt(p[0]);
+                    m = Integer.parseInt(p[1]);
+                    s = Integer.parseInt(p[2]);
+                } else if (p.length == 2) {
+                    m = Integer.parseInt(p[0]);
+                    s = Integer.parseInt(p[1]);
+                }
+                return String.format("%02d:%02d:%02d", h, m, s);
+            } else {
+                int total = Integer.parseInt(raw);
+                return String.format("%02d:%02d:%02d", total / 3600, (total % 3600) / 60, total % 60);
+            }
+        } catch (Exception e) {
+            return "00:00:00";
         }
-        String[] parts = raw.split(":");
-        List<String> list = new ArrayList<>(Arrays.asList(parts));
-        while (list.size() < 3) list.add(0, "00");
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < list.size(); i++) {
-            String p = list.get(i).length() < 2 ? "0" + list.get(i) : list.get(i);
-            sb.append(p).append(i == 2 ? "" : ":");
-        }
-        return sb.toString();
     }
 
     private List<Chapter> parseChapters(String html) {
         List<Chapter> chapters = new ArrayList<>();
-        if (html == null) return chapters;
-
-        // 1. 基本清理 HTML
-        String cleanText = html.replaceAll("<br\\s*/?>", "\n")
-                .replaceAll("<[^>]*>", " ")
-                .replaceAll("&nbsp;", " ");
-
-        // 2. 智慧過濾：嘗試多種錨點
+        String cleanText = html.replaceAll("<br\\s*/?>", "\n").replaceAll("<[^>]*>", " ").replaceAll("&nbsp;", " ");
         String sponsorLink = "www.zeczec.com/projects/hitomlb";
-        String topicAnchor = "本集討論";
-
         int sponsorIndex = cleanText.indexOf(sponsorLink);
-        int topicIndex = cleanText.indexOf(topicAnchor);
+        String targetText = (sponsorIndex != -1) ? cleanText.substring(sponsorIndex + sponsorLink.length()) : cleanText;
 
-        // 優先從贊助連結後開始解析；若無贊助則看是否有「本集討論」；皆無則從頭開始
-        int startIndex = 0;
-        if (sponsorIndex != -1) {
-            startIndex = sponsorIndex + sponsorLink.length();
-        } else if (topicIndex != -1) {
-            startIndex = topicIndex;
-        }
-
-        String targetText = cleanText.substring(startIndex);
-
-        // 3. 使用正則表達式尋找時間戳
         Pattern timePattern = Pattern.compile("\\(((\\d{1,2}:)?\\d{1,2}:\\d{2})\\)");
         Matcher m = timePattern.matcher(targetText);
-
         int lastMatchPos = 0;
         while (m.find()) {
             String timestamp = m.group(1);
-
-            // 擷取標題
-            String rawTitle = targetText.substring(lastMatchPos, m.start());
-
-            // 清理標題文字
-            String title = rawTitle.replace("\n", " ").trim();
-
-            // 再次檢查並移除「本集討論」前綴
-            if (title.contains(topicAnchor)) {
-                title = title.substring(title.indexOf(topicAnchor) + topicAnchor.length()).trim();
-            }
-
-            // 移除開頭所有標點符號與空白
+            String title = targetText.substring(lastMatchPos, m.start()).replace("\n", " ").trim();
+            if (title.contains("本集討論")) title = title.substring(title.indexOf("本集討論") + 4).trim();
             title = title.replaceAll("^[，。、；;：:：\\s]+", "").trim();
-
-            if (title.length() > 1 && !title.startsWith("http")) {
+            if (title.length() > 2 && !title.startsWith("http"))
                 chapters.add(new Chapter(title, timestamp, timeToSeconds(timestamp)));
-            }
-
             lastMatchPos = m.end();
         }
         return chapters;

@@ -67,14 +67,14 @@ function resetToInitial() {
     }
 }
 
-/**
- * 顯示主播放面板
- */
+// 主面板顯示
 function renderMain(ep, keyword = "", jumpSec = -1) {
     document.getElementById('now-title').innerText = ep.title;
     document.getElementById('now-link').href = ep.link || "#";
-    document.getElementById('now-date').innerText = formatDate(ep.pubDate);
-    document.getElementById('now-duration').innerHTML = `<i class="bi bi-clock me-1"></i>${formatDuration(ep.duration)}`;
+
+    document.getElementById('now-date').innerText = ep.pubDate;
+
+    document.getElementById('now-duration').innerHTML = `<i class="bi bi-clock me-1"></i>${ep.duration}`;
     document.getElementById('now-notes').innerHTML = ep.fullDescription;
     audio.src = ep.audioUrl;
 
@@ -94,42 +94,30 @@ function renderMain(ep, keyword = "", jumpSec = -1) {
     }
 }
 
-/**
- * 顯示側邊欄清單
- */
+// 側邊欄顯示
 function renderSidebar() {
     const start = currentPage * itemsPerPage;
-    const end = start + itemsPerPage;
-    const pageItems = currentDisplayList.slice(start, end);
+    const pageItems = currentDisplayList.slice(start, start + itemsPerPage);
+    const listDiv = document.getElementById('sidebar-list');
 
-    if (isSearchMode) {
-        sidebarList.innerHTML = pageItems.map(item => `
-            <div class="list-group-item sidebar-card p-3 mb-2 shadow-sm" 
-                 onclick="jumpToSearch('${item.ep.title.replace(/'/g, "\\'")}', ${item.ch.startSeconds})">
-                <div class="small text-primary fw-bold mb-1">${item.ep.title}</div>
-                <div class="d-flex justify-content-between align-items-center">
-                    <span class="fw-bold text-dark">${applyHighlight(item.ch.title, currentKeyword)}</span>
-                    <span class="badge bg-light text-dark border-0 small">${item.ch.timestamp}</span>
-                </div>
-            </div>
-        `).join('');
-    } else {
-        sidebarList.innerHTML = pageItems.map(ep => `
+    listDiv.innerHTML = pageItems.map(item => {
+        const ep = isSearchMode ? item.ep : item;
+        const ch = isSearchMode ? item.ch : null;
+        return `
             <div class="list-group-item sidebar-card py-3 mb-2 shadow-sm" 
-                 onclick="selectEpisode('${ep.title.replace(/'/g, "\\'")}')">
+                 onclick="${isSearchMode ? `jumpToSearch('${ep.title.replace(/'/g, "\\'")}', ${ch.startSeconds})` : `selectEpisode('${ep.title.replace(/'/g, "\\'")}')`}">
                 <div class="fw-bold text-truncate text-dark">${ep.title}</div>
                 <div class="d-flex justify-content-between mt-2">
-                    <small class="text-muted" style="font-size: 0.75rem;">${formatDate(ep.pubDate)}</small>
-                    <small class="text-secondary fw-bold" style="font-size: 0.75rem;">${formatDuration(ep.duration)}</small>
+                    <small class="text-muted" style="font-size: 0.75rem;">${ep.pubDate}</small>
+                    <small class="text-secondary fw-bold" style="font-size: 0.75rem;">${isSearchMode ? ch.timestamp : ep.duration}</small>
                 </div>
-            </div>
-        `).join('');
-    }
+            </div>`;
+    }).join('');
 
     const totalPages = Math.ceil(currentDisplayList.length / itemsPerPage) || 1;
-    pageInfo.innerText = `PAGE ${currentPage + 1} / ${totalPages}`;
-    btnPrev.disabled = currentPage === 0;
-    btnNext.disabled = end >= currentDisplayList.length;
+    document.getElementById('page-info').innerText = `PAGE ${currentPage + 1} / ${totalPages}`;
+    document.getElementById('btn-prev').disabled = currentPage === 0;
+    document.getElementById('btn-next').disabled = (start + itemsPerPage) >= currentDisplayList.length;
 }
 
 /**

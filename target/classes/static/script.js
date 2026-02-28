@@ -1,4 +1,3 @@
-/* script.js */
 let allEpisodes = [];
 let currentDisplayList = [];
 let isSearchMode = false;
@@ -7,28 +6,8 @@ let currentKeyword = "";
 const itemsPerPage = 10;
 
 const audio = document.getElementById('main-audio');
-const searchInput = document.getElementById('search-input');
-const sidebarLabel = document.getElementById('sidebar-label');
-const sidebarList = document.getElementById('sidebar-list');
-const pageInfo = document.getElementById('page-info');
-const btnPrev = document.getElementById('btn-prev');
-const btnNext = document.getElementById('btn-next');
 
-/**
- * 格式化日期：Feb 24, 2026 (Tue)
- */
-function formatDate(dateStr) {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    // 使用 UTC 避免時區跳日問題
-    return `${months[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()} (${days[date.getUTCDay()]})`;
-}
-
-/**
- * 格式化時長：確保顯示為 00:00:00
- */
+// 補足 00:00:00 格式
 function formatDuration(duration) {
     if (!duration) return "00:00:00";
     let parts = duration.split(':');
@@ -36,30 +15,28 @@ function formatDuration(duration) {
     return parts.map(v => v.padStart(2, '0')).join(':');
 }
 
-/**
- * 載入資料
- */
+// 載入資料
 async function init() {
     try {
         const res = await fetch('/api/episodes');
         allEpisodes = await res.json();
         resetToInitial();
     } catch (e) {
-        document.getElementById('now-title').innerText = "無法連線至後端服務";
+        document.getElementById('now-title').innerText = "API 連線失敗";
         console.error(e);
     }
 }
 
-/**
- * 重設狀態 (回到最新一集)
- */
+// 重設狀態
 function resetToInitial() {
-    searchInput.value = "";
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) searchInput.value = "";
     currentKeyword = "";
     isSearchMode = false;
     currentDisplayList = allEpisodes;
     currentPage = 0;
-    sidebarLabel.innerText = "📚 全部集數";
+    const label = document.getElementById('sidebar-label');
+    if (label) label.innerText = "📚 全部集數";
 
     if (allEpisodes.length > 0) {
         renderMain(allEpisodes[0]);
@@ -67,14 +44,12 @@ function resetToInitial() {
     }
 }
 
-// 主面板顯示
+// 渲染主面板
 function renderMain(ep, keyword = "", jumpSec = -1) {
     document.getElementById('now-title').innerText = ep.title;
     document.getElementById('now-link').href = ep.link || "#";
-
-    document.getElementById('now-date').innerText = ep.pubDate;
-
-    document.getElementById('now-duration').innerHTML = `<i class="bi bi-clock me-1"></i>${ep.duration}`;
+    document.getElementById('now-date').innerText = ep.pubDate; // 如實顯示字串
+    document.getElementById('now-duration').innerHTML = `<i class="bi bi-clock me-1"></i>${formatDuration(ep.duration)}`;
     document.getElementById('now-notes').innerHTML = ep.fullDescription;
     audio.src = ep.audioUrl;
 
@@ -94,10 +69,11 @@ function renderMain(ep, keyword = "", jumpSec = -1) {
     }
 }
 
-// 側邊欄顯示
+// 渲染側邊欄 (同步上下分頁)
 function renderSidebar() {
     const start = currentPage * itemsPerPage;
-    const pageItems = currentDisplayList.slice(start, start + itemsPerPage);
+    const end = start + itemsPerPage;
+    const pageItems = currentDisplayList.slice(start, end);
     const listDiv = document.getElementById('sidebar-list');
 
     listDiv.innerHTML = pageItems.map(item => {
@@ -106,34 +82,33 @@ function renderSidebar() {
         return `
             <div class="list-group-item sidebar-card py-3 mb-2 shadow-sm" 
                  onclick="${isSearchMode ? `jumpToSearch('${ep.title.replace(/'/g, "\\'")}', ${ch.startSeconds})` : `selectEpisode('${ep.title.replace(/'/g, "\\'")}')`}">
-                <div class="fw-bold text-truncate text-dark">${ep.title}</div>
+                <div class="fw-bold text-truncate text-dark small">${ep.title}</div>
                 <div class="d-flex justify-content-between mt-2">
-                    <small class="text-muted" style="font-size: 0.75rem;">${ep.pubDate}</small>
-                    <small class="text-secondary fw-bold" style="font-size: 0.75rem;">${isSearchMode ? ch.timestamp : ep.duration}</small>
+                    <small class="text-muted" style="font-size: 0.7rem;">${ep.pubDate}</small>
+                    <small class="text-secondary fw-bold" style="font-size: 0.7rem;">${isSearchMode ? ch.timestamp : formatDuration(ep.duration)}</small>
                 </div>
             </div>`;
     }).join('');
 
     const totalPages = Math.ceil(currentDisplayList.length / itemsPerPage) || 1;
-    document.getElementById('page-info').innerText = `PAGE ${currentPage + 1} / ${totalPages}`;
-    document.getElementById('btn-prev').disabled = currentPage === 0;
-    document.getElementById('btn-next').disabled = (start + itemsPerPage) >= currentDisplayList.length;
+    const pageText = `PAGE ${currentPage + 1} / ${totalPages}`;
+    const isFirst = currentPage === 0;
+    const isLast = end >= currentDisplayList.length;
+
+    document.querySelectorAll('.page-info').forEach(el => el.innerText = pageText);
+    document.querySelectorAll('.btn-prev').forEach(btn => btn.disabled = isFirst);
+    document.querySelectorAll('.btn-next').forEach(btn => btn.disabled = isLast);
 }
 
-/**
- * 處理分頁切換
- */
 function changePage(delta) {
     currentPage += delta;
     renderSidebar();
     window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
-/**
- * 關鍵字搜尋
- */
-function handleSearch() {
-    const kw = searchInput.value.trim();
+function handleSearch(event) {
+    if (event) event.preventDefault();
+    const kw = document.getElementById('search-input').value.trim();
     if (!kw) {
         resetToInitial();
         return;
@@ -142,18 +117,15 @@ function handleSearch() {
     currentKeyword = kw;
     isSearchMode = true;
     const results = [];
-
     allEpisodes.forEach(ep => {
         ep.chapters.forEach(ch => {
-            if (ch.title.toLowerCase().includes(kw.toLowerCase())) {
-                results.push({ep, ch});
-            }
+            if (ch.title.toLowerCase().includes(kw.toLowerCase())) results.push({ep, ch});
         });
     });
 
     currentDisplayList = results;
     currentPage = 0;
-    sidebarLabel.innerText = `🔍 搜尋結果 (${results.length})`;
+    document.getElementById('sidebar-label').innerText = `🔍 搜尋結果 (${results.length})`;
     renderSidebar();
 }
 
@@ -182,17 +154,21 @@ function jumpToSearch(title, sec) {
     window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
-// 綁定事件
-document.getElementById('search-input').addEventListener('keydown', function(event) {
-    // 當按下的是 Enter 鍵時 (Key Code 13)
-    if (event.key === 'Enter') {
-        handleSearch();
-    }
-});
-document.getElementById('reset-trigger').onclick = resetToInitial;
-document.getElementById('search-btn').onclick = handleSearch;
-btnPrev.onclick = () => changePage(-1);
-btnNext.onclick = () => changePage(1);
+// 事件綁定 (DOMContentLoaded 確保元素存在)
+document.addEventListener('DOMContentLoaded', () => {
+    const resetTrigger = document.getElementById('reset-trigger');
+    if (resetTrigger) resetTrigger.onclick = resetToInitial;
 
-// 初始化
-init();
+    const searchForm = document.getElementById('search-form');
+    if (searchForm) searchForm.onsubmit = handleSearch;
+
+    document.querySelectorAll('.btn-prev').forEach(btn => {
+        btn.onclick = () => changePage(-1);
+    });
+
+    document.querySelectorAll('.btn-next').forEach(btn => {
+        btn.onclick = () => changePage(1);
+    });
+
+    init(); // 啟動資料獲取
+});

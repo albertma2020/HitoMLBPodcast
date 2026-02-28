@@ -1,15 +1,13 @@
-/* style.css */
 body {
     background-color: #f8f9fa;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-/* 左上角重設圖示 */
 .reset-icon {
     width: 60px;
     height: 60px;
     cursor: pointer;
-    transition: transform 0.2s;
+    transition: 0.2s;
     border-radius: 12px;
     object-fit: cover;
     border: 2px solid #fff;
@@ -20,7 +18,6 @@ body {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
-/* 移除內部捲軸，隨頁面原生捲動 */
 .note-box {
     background: #fff;
     padding: 25px;
@@ -28,7 +25,6 @@ body {
     border: 1px solid #dee2e6;
     line-height: 1.8;
     color: #333;
-    /* 確保高度隨內容撐開 */
 }
 
 .main-card {
@@ -37,7 +33,7 @@ body {
 
 .chapter-item {
     cursor: pointer;
-    transition: 0.2s;
+    transition: 0.15s;
     border-bottom: 1px solid #f1f1f1;
 }
 
@@ -68,7 +64,6 @@ body {
     font-size: 1.3rem;
     color: #6c757d;
     vertical-align: middle;
-    transition: 0.2s;
     margin-left: 8px;
 }
 
@@ -78,7 +73,7 @@ body {
 
 .pagination-bar {
     background: white;
-    padding: 15px;
+    padding: 12px;
     border-radius: 8px;
     border: 1px solid #eee;
 }

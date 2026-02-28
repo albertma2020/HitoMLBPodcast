@@ -8,78 +8,113 @@ import keelung.nomar.hitomlbpodcast.entity.Chapter;
 import keelung.nomar.hitomlbpodcast.entity.Episode;
 import org.jdom2.Element;
 import org.springframework.stereotype.Service;
+import org.springframework.util.DigestUtils;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 public class PodcastService {
 
     private final String RSS_URL = "https://media.rss.com/hitomlb/feed.xml";
 
-    public List<Episode> fetchEpisodes() {
-        List<Episode> episodes = new ArrayList<>();
+    // --- 快取機制變數 ---
+    private List<Episode> cachedEpisodes = new ArrayList<>();
+    private String lastRssHash = ""; // 儲存上一版 RSS 的 MD5 特徵值
+
+    public synchronized List<Episode> fetchEpisodes() {
         try {
-            URLConnection conn = new URL(RSS_URL).openConnection();
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0");
+            // 1. 取得 RSS 原始 XML 字串
+            String currentRssContent = fetchRawRss(RSS_URL);
+            if (currentRssContent == null || currentRssContent.isEmpty()) return cachedEpisodes;
 
-            SyndFeedInput input = new SyndFeedInput();
-            SyndFeed feed = input.build(new XmlReader(conn));
+            // 2. 計算特徵值 (MD5) 並比對
+            String currentHash = DigestUtils.md5DigestAsHex(currentRssContent.getBytes(StandardCharsets.UTF_8));
 
-            for (SyndEntry entry : feed.getEntries()) {
-                String title = entry.getTitle();
-                if (title == null || !title.trim().startsWith("Hito 大聯盟 第")) continue;
-
-                Episode ep = new Episode();
-                ep.setTitle(title);
-                ep.setLink(entry.getLink());
-
-                String rawHtml = (entry.getDescription() != null) ? entry.getDescription().getValue() : "";
-                ep.setFullDescription(rawHtml);
-
-                // --- 核心修正：如實抓取日期 ---
-                String capturedDate = extractRawDate(rawHtml);
-                if (capturedDate.isEmpty() && entry.getPublishedDate() != null) {
-                    // 備案：若沒抓到文字標籤，才用標準日期（轉為簡單字串避免偏移）
-                    capturedDate = entry.getPublishedDate().toString();
-                }
-                ep.setPubDate(capturedDate);
-
-                // 處理時長與音軌
-                if (entry.getEnclosures() != null && !entry.getEnclosures().isEmpty()) {
-                    ep.setAudioUrl(entry.getEnclosures().get(0).getUrl());
-                }
-
-                String rawDuration = "";
-                for (Object obj : entry.getForeignMarkup()) {
-                    if (obj instanceof Element el && "duration".equals(el.getName())) {
-                        rawDuration = el.getText();
-                        break;
-                    }
-                }
-                ep.setDuration(formatDuration(rawDuration));
-                ep.setChapters(parseChapters(rawHtml));
-                episodes.add(ep);
+            if (currentHash.equals(lastRssHash) && !cachedEpisodes.isEmpty()) {
+                System.out.println(">>> RSS 內容未變動，回傳快取資料 (Efficiency Optimized)");
+                return cachedEpisodes;
             }
+
+            // 3. 內容有變動，執行解析流程
+            System.out.println(">>> 偵測到 RSS 更新，開始重新解析...");
+            List<Episode> freshEpisodes = parseRss(currentRssContent);
+
+            // 4. 更新快取與特徵值
+            this.cachedEpisodes = freshEpisodes;
+            this.lastRssHash = currentHash;
+
+            return freshEpisodes;
+
         } catch (Exception e) {
             e.printStackTrace();
+            return cachedEpisodes; // 發生錯誤時回傳最後一次成功的資料
+        }
+    }
+
+    /**
+     * 抓取原始 RSS 文字內容
+     */
+    private String fetchRawRss(String urlString) throws Exception {
+        URLConnection conn = new URL(urlString).openConnection();
+        conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+            return reader.lines().collect(Collectors.joining("\n"));
+        }
+    }
+
+    /**
+     * 解析 RSS 內容
+     */
+    private List<Episode> parseRss(String xmlContent) throws Exception {
+        List<Episode> episodes = new ArrayList<>();
+        SyndFeedInput input = new SyndFeedInput();
+        // 將 String 轉回 Reader 供 ROME 解析
+        SyndFeed feed = input.build(new XmlReader(new java.io.ByteArrayInputStream(xmlContent.getBytes(StandardCharsets.UTF_8))));
+
+        for (SyndEntry entry : feed.getEntries()) {
+            String title = entry.getTitle();
+            if (title == null || !title.trim().startsWith("Hito 大聯盟 第")) continue;
+
+            Episode ep = new Episode();
+            ep.setTitle(title);
+            ep.setLink(entry.getLink());
+
+            String rawHtml = (entry.getDescription() != null) ? entry.getDescription().getValue() : "";
+            ep.setFullDescription(rawHtml);
+            ep.setPubDate(extractRawDate(rawHtml)); // 如實記錄日期字串
+
+            if (entry.getEnclosures() != null && !entry.getEnclosures().isEmpty()) {
+                ep.setAudioUrl(entry.getEnclosures().get(0).getUrl());
+            }
+
+            String rawDuration = "";
+            for (Object obj : entry.getForeignMarkup()) {
+                if (obj instanceof Element el && "duration".equals(el.getName())) {
+                    rawDuration = el.getText();
+                    break;
+                }
+            }
+            ep.setDuration(formatDuration(rawDuration));
+            ep.setChapters(parseChapters(rawHtml));
+            episodes.add(ep);
         }
         return episodes;
     }
 
     private String extractRawDate(String html) {
         if (html == null) return "";
-        // 修正正則：忽略 HTML 標籤與多餘空白，精準鎖定 Published on: 後的日期
         Pattern pattern = Pattern.compile("Published on:\\s*([^<\\n|]+)");
         Matcher matcher = pattern.matcher(html);
-        if (matcher.find()) {
-            return matcher.group(1).trim();
-        }
-        return "";
+        return matcher.find() ? matcher.group(1).trim() : "";
     }
 
     private String formatDuration(String raw) {

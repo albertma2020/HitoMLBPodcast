@@ -33,7 +33,6 @@ function resetToInitial() {
     const input = document.getElementById('search-input');
     if (input) input.value = "";
 
-    // 清空全域狀態
     isSearchMode = false;
     currentKeyword = "";
     currentDisplayList = allEpisodes;
@@ -43,12 +42,11 @@ function resetToInitial() {
     if (label) label.innerText = "📚 全部集數";
 
     if (allEpisodes.length > 0) {
-        // 強制停止播放並將時間歸零
+        // 強制停止播放並歸零，且不帶入自動播放
         audio.pause();
         audio.currentTime = 0;
 
-        // 載入最新一集，但不帶入跳轉秒數（jumpSec 預設為 -1）
-        renderMain(allEpisodes[0]);
+        renderMain(allEpisodes[0]); // jumpSec 預設為 -1，不會自動播放
         renderSidebar();
     }
 }
@@ -86,7 +84,9 @@ function renderMain(ep, keyword = "", jumpSec = -1) {
     }
 }
 
-// 渲染側邊欄 (同步上下分頁)
+/**
+ * 渲染側邊欄：上下同步分頁、搜尋顯示「段落標題」
+ */
 function renderSidebar() {
     const start = currentPage * itemsPerPage;
     const end = start + itemsPerPage;
@@ -96,25 +96,31 @@ function renderSidebar() {
     listDiv.innerHTML = pageItems.map(item => {
         const ep = isSearchMode ? item.ep : item;
         const ch = isSearchMode ? item.ch : null;
+
         return `
-        <div class="list-group-item sidebar-card mb-2 shadow-sm border-0" 
-             onclick="${isSearchMode ? `jumpToSearch('${ep.title.replace(/'/g, "\\'")}', ${ch.startSeconds})` : `selectEpisode('${ep.title.replace(/'/g, "\\'")}')`}">
-            <div class="fw-bold text-truncate text-dark small">${ep.title}</div>
-            <div class="d-flex justify-content-between mt-2">
-                <small class="text-muted" style="font-size: 0.75rem;">${ep.pubDate}</small>
-                <small class="text-secondary fw-bold" style="font-size: 0.75rem;">${isSearchMode ? ch.timestamp : formatDuration(ep.duration)}</small>
-            </div>
-        </div>`;
+            <div class="list-group-item sidebar-card py-3 mb-2 shadow-sm" 
+                 onclick="${isSearchMode ? `jumpToSearch('${ep.title.replace(/'/g, "\\'")}', ${ch.startSeconds})` : `selectEpisode('${ep.title.replace(/'/g, "\\'")}')`}">
+                
+                <div class="fw-bold text-truncate text-dark small">${ep.title}</div>
+                
+                ${isSearchMode ? `
+                <div class="text-primary text-truncate small my-1" style="font-size: 0.75rem;">
+                    <i class="bi bi-hash"></i>${applyHighlight(ch.title, currentKeyword)}
+                </div>` : ''}
+                
+                <div class="d-flex justify-content-between mt-2">
+                    <small class="text-muted" style="font-size: 0.7rem;">${ep.pubDate}</small>
+                    <small class="text-secondary fw-bold" style="font-size: 0.7rem;">
+                        ${isSearchMode ? `<i class="bi bi-play-circle me-1"></i>${ch.timestamp}` : formatDuration(ep.duration)}
+                    </small>
+                </div>
+            </div>`;
     }).join('');
 
     const totalPages = Math.ceil(currentDisplayList.length / itemsPerPage) || 1;
-    const pageText = `PAGE ${currentPage + 1} / ${totalPages}`;
-    const isFirst = currentPage === 0;
-    const isLast = end >= currentDisplayList.length;
-
-    document.querySelectorAll('.page-info').forEach(el => el.innerText = pageText);
-    document.querySelectorAll('.btn-prev').forEach(btn => btn.disabled = isFirst);
-    document.querySelectorAll('.btn-next').forEach(btn => btn.disabled = isLast);
+    document.querySelectorAll('.page-info').forEach(el => el.innerText = `PAGE ${currentPage + 1} / ${totalPages}`);
+    document.querySelectorAll('.btn-prev').forEach(btn => btn.disabled = currentPage === 0);
+    document.querySelectorAll('.btn-next').forEach(btn => btn.disabled = end >= currentDisplayList.length);
 }
 
 function changePage(delta) {
@@ -171,7 +177,7 @@ function jumpToSearch(title, sec) {
     window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
-// 事件綁定 
+// 事件綁定
 document.addEventListener('DOMContentLoaded', () => {
     const resetTrigger = document.getElementById('reset-trigger');
     if (resetTrigger) resetTrigger.onclick = resetToInitial;

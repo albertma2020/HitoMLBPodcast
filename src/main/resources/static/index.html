@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hito大聯盟 專屬播放器</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="icon" href="https://img.rss.com/hitomlb/396/ep_cover_20260224_040256_f055166c34a909d94013b12b4e7a5e90.png" type="image/png">
+    <link rel="icon"
+          href="https://img.rss.com/hitomlb/396/ep_cover_20260224_040256_f055166c34a909d94013b12b4e7a5e90.png"
+          type="image/png">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -35,22 +37,28 @@
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm p-4 mb-4 main-card">
                 <audio id="main-audio" controls class="w-100 mb-5 shadow-sm"></audio>
-
                 <h5 class="fw-bold mb-3"><i class="bi bi-list-task me-2 text-primary"></i>章節段落</h5>
                 <div id="chapter-list" class="list-group shadow-sm mb-5 border rounded-3 overflow-hidden"></div>
-
-                <h5 class="fw-bold mb-3"><i class="bi bi-info-circle me-2 text-primary"></i>單集資訊 (Episode Notes)</h5>
+                <h5 class="fw-bold mb-3"><i class="bi bi-info-circle me-2 text-primary"></i>單集資訊 (Episode Notes)
+                </h5>
                 <div id="now-notes" class="note-box shadow-sm"></div>
             </div>
         </div>
 
         <div class="col-lg-4">
-            <form id="search-form" class="mb-4">
+            <form id="search-form" class="mb-2">
                 <div class="input-group shadow-sm">
                     <input type="text" id="search-input" class="form-control" placeholder="輸入關鍵字...">
                     <button type="submit" class="btn btn-primary px-4">搜尋</button>
                 </div>
             </form>
+
+            <div class="d-flex justify-content-end mb-4">
+                <button type="button" class="btn btn-sm btn-outline-primary border-0" data-bs-toggle="modal"
+                        data-bs-target="#keywordModal">
+                    <i class="bi bi-lightbulb me-1"></i>推薦關鍵字
+                </button>
+            </div>
 
             <h5 id="sidebar-label" class="fw-bold mb-4 text-secondary">全部集數</h5>
 
@@ -79,6 +87,22 @@
     </div>
 </div>
 
+<div class="modal fade" id="keywordModal" tabindex="-1" aria-labelledby="keywordModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold" id="keywordModalLabel">推薦關鍵字</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="keyword-grid" class="row g-2">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

@@ -20,6 +20,7 @@ async function init() {
         const res = await fetch('/api/episodes');
         allEpisodes = await res.json();
         resetToInitial();
+        loadRecommendedKeywords(); // 初始化時同步載入推薦清單
     } catch (e) {
         document.getElementById('now-title').innerText = "API 連線失敗";
         console.error(e);
@@ -27,7 +28,43 @@ async function init() {
 }
 
 /**
- * 重設狀態：清空搜尋、回到最新一集，且停止播放
+ * 載入推薦關鍵字並生成 Modal 內容
+ */
+async function loadRecommendedKeywords() {
+    try {
+        const res = await fetch('/api/recommended-keywords');
+        const keywords = await res.json();
+        const grid = document.getElementById('keyword-grid');
+
+        grid.innerHTML = keywords.map(kw => `
+            <div class="col-6">
+                <button class="btn btn-outline-secondary w-100 text-truncate py-2 small fw-medium" 
+                        onclick="selectKeyword('${kw}')">${kw}</button>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.error("無法載入推薦關鍵字", e);
+    }
+}
+
+/**
+ * 選取關鍵字後的動作
+ */
+function selectKeyword(kw) {
+    const input = document.getElementById('search-input');
+    input.value = kw;
+
+    // 關閉 Modal
+    const modalEl = document.getElementById('keywordModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+
+    // 自動執行搜尋
+    handleSearch();
+}
+
+/**
+ * 重設狀態：清空搜尋、回到最新一集，且完全停止播放並歸零
  */
 function resetToInitial() {
     const input = document.getElementById('search-input');
@@ -42,11 +79,11 @@ function resetToInitial() {
     if (label) label.innerText = "📚 全部集數";
 
     if (allEpisodes.length > 0) {
-        // 核心修正：強制停止播放並歸零，且不帶入自動播放
+        // 核心修正：強制停止播放並歸零
         audio.pause();
         audio.currentTime = 0;
 
-        renderMain(allEpisodes[0]); // jumpSec 預設為 -1，不會自動播放
+        renderMain(allEpisodes[0]);
         renderSidebar();
     }
 }
@@ -61,10 +98,8 @@ function renderMain(ep, keyword = "", jumpSec = -1) {
     document.getElementById('now-duration').innerHTML = `<i class="bi bi-clock me-1"></i>${formatDuration(ep.duration)}`;
     document.getElementById('now-notes').innerHTML = ep.fullDescription;
 
-    // 設定音訊來源
     audio.src = ep.audioUrl;
 
-    // 渲染章節清單
     const container = document.getElementById('chapter-list');
     container.innerHTML = ep.chapters.map(ch => `
         <div class="list-group-item chapter-item d-flex align-items-center py-3" onclick="seekTo(${ch.startSeconds}, this)">
@@ -72,20 +107,18 @@ function renderMain(ep, keyword = "", jumpSec = -1) {
             <span class="flex-grow-1 text-dark">${applyHighlight(ch.title, keyword)}</span>
         </div>`).join('');
 
-    // 只有在點擊「搜尋結果」或「特定章節」時（即 jumpSec >= 0），才觸發自動播放
     if (jumpSec >= 0) {
         audio.onloadedmetadata = () => {
             audio.currentTime = jumpSec;
             audio.play();
         };
     } else {
-        // 如果是重設或切換集數，確保不自動執行 play()
         audio.onloadedmetadata = null;
     }
 }
 
 /**
- * 渲染側邊欄：上下同步分頁、搜尋顯示「段落標題」
+ * 渲染側邊欄：同步分頁、搜尋顯示「段落標題」並防止遮擋
  */
 function renderSidebar() {
     const start = currentPage * itemsPerPage;
@@ -104,7 +137,7 @@ function renderSidebar() {
                 <div class="fw-bold text-truncate text-dark small">${ep.title}</div>
                 
                 ${isSearchMode ? `
-                <div class="text-primary text-truncate small my-1" style="font-size: 0.75rem;">
+                <div class="text-primary text-truncate my-1" style="font-size: 0.75rem; max-width: 85%;">
                     <i class="bi bi-hash"></i>${applyHighlight(ch.title, currentKeyword)}
                 </div>` : ''}
                 
@@ -179,19 +212,11 @@ function jumpToSearch(title, sec) {
 
 // 事件綁定
 document.addEventListener('DOMContentLoaded', () => {
-    const resetTrigger = document.getElementById('reset-trigger');
-    if (resetTrigger) resetTrigger.onclick = resetToInitial;
-
+    document.querySelectorAll('#reset-trigger, .reset-trigger').forEach(trigger => trigger.onclick = resetToInitial);
     const searchForm = document.getElementById('search-form');
     if (searchForm) searchForm.onsubmit = handleSearch;
+    document.querySelectorAll('.btn-prev').forEach(btn => btn.onclick = () => changePage(-1));
+    document.querySelectorAll('.btn-next').forEach(btn => btn.onclick = () => changePage(1));
 
-    document.querySelectorAll('.btn-prev').forEach(btn => {
-        btn.onclick = () => changePage(-1);
-    });
-
-    document.querySelectorAll('.btn-next').forEach(btn => {
-        btn.onclick = () => changePage(1);
-    });
-
-    init(); // 啟動資料獲取
+    init();
 });

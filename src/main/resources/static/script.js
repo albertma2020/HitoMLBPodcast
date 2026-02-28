@@ -7,7 +7,6 @@ const itemsPerPage = 10;
 
 const audio = document.getElementById('main-audio');
 
-// 補足 00:00:00 格式
 function formatDuration(duration) {
     if (!duration) return "00:00:00";
     let parts = duration.split(':');
@@ -55,7 +54,7 @@ function resetToInitial() {
 }
 
 /**
- * 渲染主面板：只有在明確指定 jumpSec 時才自動播放
+ * 渲染主面板
  */
 function renderMain(ep, keyword = "", jumpSec = -1) {
     document.getElementById('now-title').innerText = ep.title;
@@ -98,14 +97,14 @@ function renderSidebar() {
         const ep = isSearchMode ? item.ep : item;
         const ch = isSearchMode ? item.ch : null;
         return `
-            <div class="list-group-item sidebar-card py-3 mb-2 shadow-sm" 
-                 onclick="${isSearchMode ? `jumpToSearch('${ep.title.replace(/'/g, "\\'")}', ${ch.startSeconds})` : `selectEpisode('${ep.title.replace(/'/g, "\\'")}')`}">
-                <div class="fw-bold text-truncate text-dark small">${ep.title}</div>
-                <div class="d-flex justify-content-between mt-2">
-                    <small class="text-muted" style="font-size: 0.7rem;">${ep.pubDate}</small>
-                    <small class="text-secondary fw-bold" style="font-size: 0.7rem;">${isSearchMode ? ch.timestamp : formatDuration(ep.duration)}</small>
-                </div>
-            </div>`;
+        <div class="list-group-item sidebar-card mb-2 shadow-sm border-0" 
+             onclick="${isSearchMode ? `jumpToSearch('${ep.title.replace(/'/g, "\\'")}', ${ch.startSeconds})` : `selectEpisode('${ep.title.replace(/'/g, "\\'")}')`}">
+            <div class="fw-bold text-truncate text-dark small">${ep.title}</div>
+            <div class="d-flex justify-content-between mt-2">
+                <small class="text-muted" style="font-size: 0.75rem;">${ep.pubDate}</small>
+                <small class="text-secondary fw-bold" style="font-size: 0.75rem;">${isSearchMode ? ch.timestamp : formatDuration(ep.duration)}</small>
+            </div>
+        </div>`;
     }).join('');
 
     const totalPages = Math.ceil(currentDisplayList.length / itemsPerPage) || 1;
@@ -172,7 +171,7 @@ function jumpToSearch(title, sec) {
     window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
-// 事件綁定 (DOMContentLoaded 確保元素存在)
+// 事件綁定 
 document.addEventListener('DOMContentLoaded', () => {
     const resetTrigger = document.getElementById('reset-trigger');
     if (resetTrigger) resetTrigger.onclick = resetToInitial;

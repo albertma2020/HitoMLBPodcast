@@ -78,15 +78,25 @@ body {
     border: 1px solid #eee;
 }
 
+/* style.css */
 .sidebar-card {
     border-radius: 12px;
     border: 1px solid #eee;
     transition: 0.2s;
     cursor: pointer;
     background-color: #fff;
+    /* 核心修正：增加左右內距 (22px)，並稍微調整上下內距 (18px) */
+    padding: 18px 22px !important;
 }
 
 .sidebar-card:hover {
     border-color: #0d6efd;
     transform: translateY(-2px);
+    background-color: #fcfdff; /* 稍微變色增加互動感 */
+}
+
+/* 確保側邊欄標題也有足夠間距 */
+.sidebar-card .fw-bold {
+    margin-bottom: 6px;
+    display: block;
 }

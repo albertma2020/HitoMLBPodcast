@@ -27,45 +27,63 @@ async function init() {
     }
 }
 
-// 重設狀態
+/**
+ * 重設狀態：清空搜尋、回到最新一集，且停止播放
+ */
 function resetToInitial() {
-    const searchInput = document.getElementById('search-input');
-    if (searchInput) searchInput.value = "";
-    currentKeyword = "";
+    const input = document.getElementById('search-input');
+    if (input) input.value = "";
+
+    // 清空全域狀態
     isSearchMode = false;
+    currentKeyword = "";
     currentDisplayList = allEpisodes;
     currentPage = 0;
+
     const label = document.getElementById('sidebar-label');
     if (label) label.innerText = "📚 全部集數";
 
     if (allEpisodes.length > 0) {
+        // 強制停止播放並將時間歸零
+        audio.pause();
+        audio.currentTime = 0;
+
+        // 載入最新一集，但不帶入跳轉秒數（jumpSec 預設為 -1）
         renderMain(allEpisodes[0]);
         renderSidebar();
     }
 }
 
-// 渲染主面板
+/**
+ * 渲染主面板：只有在明確指定 jumpSec 時才自動播放
+ */
 function renderMain(ep, keyword = "", jumpSec = -1) {
     document.getElementById('now-title').innerText = ep.title;
     document.getElementById('now-link').href = ep.link || "#";
-    document.getElementById('now-date').innerText = ep.pubDate; // 如實顯示字串
+    document.getElementById('now-date').innerText = ep.pubDate;
     document.getElementById('now-duration').innerHTML = `<i class="bi bi-clock me-1"></i>${formatDuration(ep.duration)}`;
     document.getElementById('now-notes').innerHTML = ep.fullDescription;
+
+    // 設定音訊來源
     audio.src = ep.audioUrl;
 
+    // 渲染章節清單
     const container = document.getElementById('chapter-list');
     container.innerHTML = ep.chapters.map(ch => `
         <div class="list-group-item chapter-item d-flex align-items-center py-3" onclick="seekTo(${ch.startSeconds}, this)">
             <span class="badge bg-dark time-badge me-3">${ch.timestamp}</span>
             <span class="flex-grow-1 text-dark">${applyHighlight(ch.title, keyword)}</span>
-        </div>
-    `).join('');
+        </div>`).join('');
 
+    // 只有在點擊「搜尋結果」或「特定章節」時（即 jumpSec >= 0），才觸發自動播放
     if (jumpSec >= 0) {
         audio.onloadedmetadata = () => {
             audio.currentTime = jumpSec;
             audio.play();
         };
+    } else {
+        // 如果是重設或切換集數，確保不自動執行 play()
+        audio.onloadedmetadata = null;
     }
 }
 

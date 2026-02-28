@@ -27,10 +27,10 @@ public class PodcastController {
     @GetMapping("/recommended-keywords")
     public List<String> getRecommendedKeywords() {
         return Arrays.asList(
-                "洋基", "紅襪", "道奇", "大都會", "教士", "太空人",
-                "勇士", "光芒", "水手", "雙城", "巨人", "白襪",
-                "大谷翔平", "Judge", "Raleigh", "Soto", "Devers", "山本由伸",
-                "Crochet", "Skubal", "Skenes", "Cole", "張育成", "鄭宗哲"
+                "紅襪", "洋基", "道奇", "大都會", "教士", "太空人", "勇士", "光芒", "水手", "雙城", "巨人", "白襪", "運動家", "天使",
+                "大谷翔平", "Judge", "Soto", "Raleigh", "Devers", "Betts", "Harper",
+                "Crochet", "Skubal", "Skenes", "山本由伸", "Kershaw", "Verlander", "Scherzer",
+                "張育成", "鄭宗哲"
         );
     }
 }

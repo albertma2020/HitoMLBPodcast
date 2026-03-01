@@ -78,14 +78,12 @@ body {
     border: 1px solid #eee;
 }
 
-/* style.css */
 .sidebar-card {
     border-radius: 12px;
     border: 1px solid #eee;
     transition: 0.2s;
     cursor: pointer;
     background-color: #fff;
-    /* 核心修正：增加左右內距 (22px)，並稍微調整上下內距 (18px) */
     padding: 18px 22px !important;
 }
 

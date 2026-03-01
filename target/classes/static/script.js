@@ -118,7 +118,7 @@ function renderMain(ep, keyword = "", jumpSec = -1) {
 }
 
 /**
- * 渲染側邊欄：同步分頁、搜尋顯示「段落標題」並防止遮擋
+ * 渲染側邊欄：同步分頁、搜尋顯示「段落標題」並防止遮擋，且加入 Tooltip 顯示全名
  */
 function renderSidebar() {
     const start = currentPage * itemsPerPage;
@@ -134,10 +134,10 @@ function renderSidebar() {
             <div class="list-group-item sidebar-card py-3 mb-2 shadow-sm" 
                  onclick="${isSearchMode ? `jumpToSearch('${ep.title.replace(/'/g, "\\'")}', ${ch.startSeconds})` : `selectEpisode('${ep.title.replace(/'/g, "\\'")}')`}">
                 
-                <div class="fw-bold text-truncate text-dark small">${ep.title}</div>
+                <div class="fw-bold text-truncate text-dark small" title="${ep.title}">${ep.title}</div>
                 
                 ${isSearchMode ? `
-                <div class="text-primary text-truncate my-1" style="font-size: 0.75rem; max-width: 85%;">
+                <div class="text-primary text-truncate my-1" style="font-size: 0.75rem; max-width: 85%;" title="${ch.title}">
                     <i class="bi bi-hash"></i>${applyHighlight(ch.title, currentKeyword)}
                 </div>` : ''}
                 

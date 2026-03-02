@@ -1,3 +1,4 @@
+// 全域變數定義
 let allEpisodes = [];
 let currentDisplayList = [];
 let isSearchMode = false;
@@ -7,6 +8,9 @@ const itemsPerPage = 10;
 
 const audio = document.getElementById('main-audio');
 
+/**
+ * 格式化時長：確保顯示為 00:00:00 格式
+ */
 function formatDuration(duration) {
     if (!duration) return "00:00:00";
     let parts = duration.split(':');
@@ -14,21 +18,54 @@ function formatDuration(duration) {
     return parts.map(v => v.padStart(2, '0')).join(':');
 }
 
-// 載入資料
+/**
+ * 初始化載入：採分段載入策略以縮短首屏時間
+ */
 async function init() {
     try {
-        const res = await fetch('/api/episodes');
-        allEpisodes = await res.json();
-        resetToInitial();
-        loadRecommendedKeywords(); // 初始化時同步載入推薦清單
+        // 第一階段：優先抓取並顯示最新一集
+        const latestRes = await fetch('/api/episodes/latest');
+        const latestEp = await latestRes.json();
+        renderMain(latestEp);
+
+        // 側邊欄顯示載入中狀態
+        document.getElementById('sidebar-list').innerHTML = `
+            <div class="text-center py-5 text-muted">
+                <div class="spinner-border spinner-border-sm me-2"></div> 載入歷史集數中...
+            </div>`;
+
+        // 同步載入推薦關鍵字與完整歷史資料
+        loadRecommendedKeywords();
+        loadFullHistory();
     } catch (e) {
-        document.getElementById('now-title').innerText = "API 連線失敗";
+        document.getElementById('now-title').innerText = "資料載入失敗";
         console.error(e);
     }
 }
 
 /**
- * 載入推薦關鍵字並生成 Modal 內容
+ * 背景載入完整歷史集數
+ */
+async function loadFullHistory() {
+    try {
+        const res = await fetch('/api/episodes');
+        allEpisodes = await res.json();
+
+        // 載入完成後更新側邊欄
+        if (!isSearchMode) {
+            currentDisplayList = allEpisodes;
+            renderSidebar();
+        }
+
+        const label = document.getElementById('sidebar-label');
+        if (label) label.innerText = "📚 全部集數";
+    } catch (e) {
+        console.error("完整歷史載入失敗", e);
+    }
+}
+
+/**
+ * 載入推薦關鍵字清單
  */
 async function loadRecommendedKeywords() {
     try {
@@ -48,23 +85,23 @@ async function loadRecommendedKeywords() {
 }
 
 /**
- * 選取關鍵字後的動作
+ * 處理推薦關鍵字選取
  */
 function selectKeyword(kw) {
     const input = document.getElementById('search-input');
     input.value = kw;
 
-    // 關閉 Modal
+    // 關閉 Modal 視窗
     const modalEl = document.getElementById('keywordModal');
     const modal = bootstrap.Modal.getInstance(modalEl);
     if (modal) modal.hide();
 
-    // 自動執行搜尋
+    // 執行檢索
     handleSearch();
 }
 
 /**
- * 重設狀態：清空搜尋、回到最新一集，且完全停止播放並歸零
+ * 重設狀態：停止播放、時間歸零並回到初始畫面
  */
 function resetToInitial() {
     const input = document.getElementById('search-input');
@@ -72,24 +109,24 @@ function resetToInitial() {
 
     isSearchMode = false;
     currentKeyword = "";
-    currentDisplayList = allEpisodes;
     currentPage = 0;
 
     const label = document.getElementById('sidebar-label');
     if (label) label.innerText = "📚 全部集數";
 
     if (allEpisodes.length > 0) {
-        // 核心修正：強制停止播放並歸零
+        // 停止目前的音訊並歸零
         audio.pause();
         audio.currentTime = 0;
 
+        currentDisplayList = allEpisodes;
         renderMain(allEpisodes[0]);
         renderSidebar();
     }
 }
 
 /**
- * 渲染主面板
+ * 渲染主播放面板
  */
 function renderMain(ep, keyword = "", jumpSec = -1) {
     document.getElementById('now-title').innerText = ep.title;
@@ -107,6 +144,7 @@ function renderMain(ep, keyword = "", jumpSec = -1) {
             <span class="flex-grow-1 text-dark">${applyHighlight(ch.title, keyword)}</span>
         </div>`).join('');
 
+    // 僅在有指定跳轉時間時才自動播放
     if (jumpSec >= 0) {
         audio.onloadedmetadata = () => {
             audio.currentTime = jumpSec;
@@ -118,7 +156,7 @@ function renderMain(ep, keyword = "", jumpSec = -1) {
 }
 
 /**
- * 渲染側邊欄：同步分頁、搜尋顯示「段落標題」並防止遮擋，且加入 Tooltip 顯示全名
+ * 渲染側邊欄清單：包含 Tooltip 與搜尋段落顯示
  */
 function renderSidebar() {
     const start = currentPage * itemsPerPage;
@@ -150,27 +188,32 @@ function renderSidebar() {
             </div>`;
     }).join('');
 
+    // 同步更新分頁資訊
     const totalPages = Math.ceil(currentDisplayList.length / itemsPerPage) || 1;
     document.querySelectorAll('.page-info').forEach(el => el.innerText = `PAGE ${currentPage + 1} / ${totalPages}`);
     document.querySelectorAll('.btn-prev').forEach(btn => btn.disabled = currentPage === 0);
     document.querySelectorAll('.btn-next').forEach(btn => btn.disabled = end >= currentDisplayList.length);
 }
 
+/**
+ * 分頁切換邏輯：包含手機版智慧捲動
+ */
 function changePage(delta) {
     currentPage += delta;
     renderSidebar();
 
-    // 判斷是否為手機版 (Bootstrap lg 斷點為 992px)
+    // 手機版自動捲動至清單頂部
     if (window.innerWidth < 992) {
         const sidebarLabel = document.getElementById('sidebar-label');
         if (sidebarLabel) {
-            // 只有手機版才捲動到側邊欄起始位置
             sidebarLabel.scrollIntoView({behavior: 'smooth', block: 'start'});
         }
     }
-    // 桌機版則完全不執行捲動，保持播放器在視線內
 }
 
+/**
+ * 處理關鍵字檢索
+ */
 function handleSearch(event) {
     if (event) event.preventDefault();
     const kw = document.getElementById('search-input').value.trim();
@@ -184,7 +227,9 @@ function handleSearch(event) {
     const results = [];
     allEpisodes.forEach(ep => {
         ep.chapters.forEach(ch => {
-            if (ch.title.toLowerCase().includes(kw.toLowerCase())) results.push({ep, ch});
+            if (ch.title.toLowerCase().includes(kw.toLowerCase())) {
+                results.push({ep, ch});
+            }
         });
     });
 
@@ -194,12 +239,18 @@ function handleSearch(event) {
     renderSidebar();
 }
 
+/**
+ * 關鍵字高亮處理
+ */
 function applyHighlight(text, kw) {
     if (!kw) return text;
     const regex = new RegExp(`(${kw})`, 'gi');
     return text.replace(regex, '<span class="highlight">$1</span>');
 }
 
+/**
+ * 音訊跳轉至指定秒數
+ */
 function seekTo(sec, el) {
     audio.currentTime = sec;
     audio.play();
@@ -207,29 +258,43 @@ function seekTo(sec, el) {
     el.classList.add('active');
 }
 
+/**
+ * 選取特定集數
+ */
 function selectEpisode(title) {
     const ep = allEpisodes.find(e => e.title === title);
     renderMain(ep);
-
-    // 選取集數後，不論桌機或手機，平滑捲動回最上方看播放器
+    // 選取後捲動至頂部觀看播放器
     window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
+/**
+ * 跳轉至搜尋結果的特定集數與段落
+ */
 function jumpToSearch(title, sec) {
     const ep = allEpisodes.find(e => e.title === title);
     renderMain(ep, currentKeyword, sec);
-
-    // 點擊搜尋結果後，平滑捲動回最上方看播放器
+    // 跳轉後捲動至頂部觀看播放器
     window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
-// 事件綁定
+/**
+ * 事件監聽綁定
+ */
 document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('#reset-trigger, .reset-trigger').forEach(trigger => trigger.onclick = resetToInitial);
+    // 綁定所有重設觸發元件
+    document.querySelectorAll('#reset-trigger, .reset-trigger').forEach(trigger => {
+        trigger.onclick = resetToInitial;
+    });
+
+    // 綁定搜尋表單
     const searchForm = document.getElementById('search-form');
     if (searchForm) searchForm.onsubmit = handleSearch;
+
+    // 綁定分頁按鈕
     document.querySelectorAll('.btn-prev').forEach(btn => btn.onclick = () => changePage(-1));
     document.querySelectorAll('.btn-next').forEach(btn => btn.onclick = () => changePage(1));
 
+    // 啟動初始化程序
     init();
 });

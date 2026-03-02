@@ -160,12 +160,15 @@ function changePage(delta) {
     currentPage += delta;
     renderSidebar();
 
-    // 定位到側邊欄標題
-    const sidebarLabel = document.getElementById('sidebar-label');
-    if (sidebarLabel) {
-        // block: 'start' 會讓標題對齊螢幕上方，並保有 smooth 平滑效果
-        sidebarLabel.scrollIntoView({behavior: 'smooth', block: 'start'});
+    // 判斷是否為手機版 (Bootstrap lg 斷點為 992px)
+    if (window.innerWidth < 992) {
+        const sidebarLabel = document.getElementById('sidebar-label');
+        if (sidebarLabel) {
+            // 只有手機版才捲動到側邊欄起始位置
+            sidebarLabel.scrollIntoView({behavior: 'smooth', block: 'start'});
+        }
     }
+    // 桌機版則完全不執行捲動，保持播放器在視線內
 }
 
 function handleSearch(event) {
@@ -207,12 +210,16 @@ function seekTo(sec, el) {
 function selectEpisode(title) {
     const ep = allEpisodes.find(e => e.title === title);
     renderMain(ep);
+
+    // 選取集數後，不論桌機或手機，平滑捲動回最上方看播放器
     window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 function jumpToSearch(title, sec) {
     const ep = allEpisodes.find(e => e.title === title);
     renderMain(ep, currentKeyword, sec);
+
+    // 點擊搜尋結果後，平滑捲動回最上方看播放器
     window.scrollTo({top: 0, behavior: 'smooth'});
 }
 

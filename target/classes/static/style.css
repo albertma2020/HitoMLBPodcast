@@ -1,6 +1,15 @@
+html {
+    scroll-behavior: smooth; /* 確保全域捲動皆具備平滑動畫效果 */
+}
+
 body {
     background-color: #f8f9fa;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* 增加側邊欄標題的上邊距，避免捲動後貼得太緊 */
+#sidebar-label {
+    scroll-margin-top: 20px; /* 捲動定位時預留 20px 空隙，視覺上較不擁擠 */
 }
 
 .reset-icon {

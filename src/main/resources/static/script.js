@@ -159,7 +159,13 @@ function renderSidebar() {
 function changePage(delta) {
     currentPage += delta;
     renderSidebar();
-    window.scrollTo({top: 0, behavior: 'smooth'});
+
+    // 定位到側邊欄標題
+    const sidebarLabel = document.getElementById('sidebar-label');
+    if (sidebarLabel) {
+        // block: 'start' 會讓標題對齊螢幕上方，並保有 smooth 平滑效果
+        sidebarLabel.scrollIntoView({behavior: 'smooth', block: 'start'});
+    }
 }
 
 function handleSearch(event) {

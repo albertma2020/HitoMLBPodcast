@@ -236,7 +236,7 @@ function changePage(delta) {
 }
 
 /**
- * 處理關鍵字檢索
+ * 處理關鍵字檢索：支援 OR 功能 (|)
  */
 function handleSearch(event) {
     if (event) event.preventDefault();
@@ -248,10 +248,16 @@ function handleSearch(event) {
 
     currentKeyword = kw;
     isSearchMode = true;
+
+    // 將關鍵字以 | 拆分並移除空白
+    const kwList = kw.split('|').map(s => s.trim()).filter(s => s !== "");
+
     const results = [];
     allEpisodes.forEach(ep => {
         ep.chapters.forEach(ch => {
-            if (ch.title.toLowerCase().includes(kw.toLowerCase())) {
+            // 只要符合陣列中任一個關鍵字即納入結果
+            const isMatch = kwList.some(k => ch.title.toLowerCase().includes(k.toLowerCase()));
+            if (isMatch) {
                 results.push({ep, ch});
             }
         });
@@ -264,11 +270,20 @@ function handleSearch(event) {
 }
 
 /**
- * 關鍵字高亮處理
+ * 關鍵字高亮處理：支援多重關鍵字標記
  */
 function applyHighlight(text, kw) {
     if (!kw) return text;
-    const regex = new RegExp(`(${kw})`, 'gi');
+
+    // 處理 OR 功能的正規表示式組合
+    const kwList = kw.split('|')
+        .map(s => s.trim())
+        .filter(s => s !== "")
+        .map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); // 轉義特殊字元避免 Regex 錯誤
+
+    if (kwList.length === 0) return text;
+
+    const regex = new RegExp(`(${kwList.join('|')})`, 'gi');
     return text.replace(regex, '<span class="highlight">$1</span>');
 }
 

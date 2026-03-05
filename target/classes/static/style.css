@@ -9,7 +9,7 @@ body {
 
 /* 增加側邊欄標題的上邊距，避免捲動後貼得太緊 */
 #sidebar-label {
-    scroll-margin-top: 20px; /* 捲動定位時預留 20px 空隙，視覺上較不擁擠 */
+    scroll-margin-top: 20px; /* 捲動定位時預留 20px 空隙 */
 }
 
 .reset-icon {
@@ -93,16 +93,15 @@ body {
     transition: 0.2s;
     cursor: pointer;
     background-color: #fff;
-    padding: 18px 22px !important;
+    padding: 18px 22px !important; /* 保留您要求的內距設定 */
 }
 
 .sidebar-card:hover {
     border-color: #0d6efd;
     transform: translateY(-2px);
-    background-color: #fcfdff; /* 稍微變色增加互動感 */
+    background-color: #fcfdff;
 }
 
-/* 確保側邊欄標題也有足夠間距 */
 .sidebar-card .fw-bold {
     margin-bottom: 6px;
     display: block;

@@ -19,10 +19,13 @@ function formatDuration(duration) {
 }
 
 /**
- * 初始化載入：採分段載入策略以縮短首屏時間
+ * 初始化載入：採分段載入策略，並在載入期間停用搜尋功能
  */
 async function init() {
     try {
+        // 初始狀態先停用搜尋相關功能，避免資料不完整時進行檢索
+        toggleSearchState(false);
+
         // 第一階段：優先抓取並顯示最新一集
         const latestRes = await fetch('/api/episodes/latest');
         const latestEp = await latestRes.json();
@@ -44,7 +47,26 @@ async function init() {
 }
 
 /**
- * 背景載入完整歷史集數
+ * 控制搜尋組件的啟用/停用狀態
+ */
+function toggleSearchState(isEnabled) {
+    const searchInput = document.getElementById('search-input');
+    const searchBtn = document.querySelector('#search-form button[type="submit"]');
+    const recommendBtn = document.querySelector('button[data-bs-target="#keywordModal"]');
+
+    if (searchInput) searchInput.disabled = !isEnabled;
+    if (searchBtn) searchBtn.disabled = !isEnabled;
+    if (recommendBtn) {
+        // 停用時改變按鈕文字提示載入中
+        recommendBtn.disabled = !isEnabled;
+        recommendBtn.innerHTML = isEnabled ?
+            '<i class="bi bi-lightbulb me-1"></i>推薦關鍵字' :
+            '<i class="bi bi-hourglass-split me-1"></i>資料準備中...';
+    }
+}
+
+/**
+ * 背景載入完整歷史集數，完成後開啟搜尋功能
  */
 async function loadFullHistory() {
     try {
@@ -59,8 +81,14 @@ async function loadFullHistory() {
 
         const label = document.getElementById('sidebar-label');
         if (label) label.innerText = "📚 全部集數";
+
+        // 核心修正：資料完整載入後，開啟搜尋與推薦按鈕功能
+        toggleSearchState(true);
     } catch (e) {
         console.error("完整歷史載入失敗", e);
+        // 若失敗，按鈕維持停用或提示錯誤
+        const recommendBtn = document.querySelector('button[data-bs-target="#keywordModal"]');
+        if (recommendBtn) recommendBtn.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>載入失敗';
     }
 }
 
@@ -115,7 +143,6 @@ function resetToInitial() {
     if (label) label.innerText = "📚 全部集數";
 
     if (allEpisodes.length > 0) {
-        // 停止目前的音訊並歸零
         audio.pause();
         audio.currentTime = 0;
 
@@ -144,7 +171,6 @@ function renderMain(ep, keyword = "", jumpSec = -1) {
             <span class="flex-grow-1 text-dark">${applyHighlight(ch.title, keyword)}</span>
         </div>`).join('');
 
-    // 僅在有指定跳轉時間時才自動播放
     if (jumpSec >= 0) {
         audio.onloadedmetadata = () => {
             audio.currentTime = jumpSec;
@@ -188,7 +214,6 @@ function renderSidebar() {
             </div>`;
     }).join('');
 
-    // 同步更新分頁資訊
     const totalPages = Math.ceil(currentDisplayList.length / itemsPerPage) || 1;
     document.querySelectorAll('.page-info').forEach(el => el.innerText = `PAGE ${currentPage + 1} / ${totalPages}`);
     document.querySelectorAll('.btn-prev').forEach(btn => btn.disabled = currentPage === 0);
@@ -202,7 +227,6 @@ function changePage(delta) {
     currentPage += delta;
     renderSidebar();
 
-    // 手機版自動捲動至清單頂部
     if (window.innerWidth < 992) {
         const sidebarLabel = document.getElementById('sidebar-label');
         if (sidebarLabel) {
@@ -212,7 +236,7 @@ function changePage(delta) {
 }
 
 /**
- * 處理關鍵字檢索
+ * 處理關鍵字檢索：支援 OR 功能 (|)
  */
 function handleSearch(event) {
     if (event) event.preventDefault();
@@ -224,10 +248,16 @@ function handleSearch(event) {
 
     currentKeyword = kw;
     isSearchMode = true;
+
+    // 將關鍵字以 | 拆分並移除空白
+    const kwList = kw.split('|').map(s => s.trim()).filter(s => s !== "");
+
     const results = [];
     allEpisodes.forEach(ep => {
         ep.chapters.forEach(ch => {
-            if (ch.title.toLowerCase().includes(kw.toLowerCase())) {
+            // 只要符合陣列中任一個關鍵字即納入結果
+            const isMatch = kwList.some(k => ch.title.toLowerCase().includes(k.toLowerCase()));
+            if (isMatch) {
                 results.push({ep, ch});
             }
         });
@@ -240,11 +270,20 @@ function handleSearch(event) {
 }
 
 /**
- * 關鍵字高亮處理
+ * 關鍵字高亮處理：支援多重關鍵字標記
  */
 function applyHighlight(text, kw) {
     if (!kw) return text;
-    const regex = new RegExp(`(${kw})`, 'gi');
+
+    // 處理 OR 功能的正規表示式組合
+    const kwList = kw.split('|')
+        .map(s => s.trim())
+        .filter(s => s !== "")
+        .map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); // 轉義特殊字元避免 Regex 錯誤
+
+    if (kwList.length === 0) return text;
+
+    const regex = new RegExp(`(${kwList.join('|')})`, 'gi');
     return text.replace(regex, '<span class="highlight">$1</span>');
 }
 
@@ -264,7 +303,6 @@ function seekTo(sec, el) {
 function selectEpisode(title) {
     const ep = allEpisodes.find(e => e.title === title);
     renderMain(ep);
-    // 選取後捲動至頂部觀看播放器
     window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
@@ -274,7 +312,6 @@ function selectEpisode(title) {
 function jumpToSearch(title, sec) {
     const ep = allEpisodes.find(e => e.title === title);
     renderMain(ep, currentKeyword, sec);
-    // 跳轉後捲動至頂部觀看播放器
     window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
@@ -282,19 +319,15 @@ function jumpToSearch(title, sec) {
  * 事件監聽綁定
  */
 document.addEventListener('DOMContentLoaded', () => {
-    // 綁定所有重設觸發元件
     document.querySelectorAll('#reset-trigger, .reset-trigger').forEach(trigger => {
         trigger.onclick = resetToInitial;
     });
 
-    // 綁定搜尋表單
     const searchForm = document.getElementById('search-form');
     if (searchForm) searchForm.onsubmit = handleSearch;
 
-    // 綁定分頁按鈕
     document.querySelectorAll('.btn-prev').forEach(btn => btn.onclick = () => changePage(-1));
     document.querySelectorAll('.btn-next').forEach(btn => btn.onclick = () => changePage(1));
 
-    // 啟動初始化程序
     init();
 });

@@ -46,7 +46,7 @@ async function init() {
  */
 function updateVisitCount() {
     const workspace = "albertma2020s-team-3154";
-    const name = "first-counter-3154";
+    const name = "hitomlb";
 
     fetch(`https://api.counterapi.dev/v2/${workspace}/${name}/up`)
         .then(res => res.json())

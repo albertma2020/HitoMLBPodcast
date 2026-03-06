@@ -16,14 +16,14 @@ function formatDuration(duration) {
 }
 
 /**
- * 初始化載入：統計造訪數、先抓最新集數後補齊歷史資料
+ * 初始化載入：統計造訪數、分段載入集數
  */
 async function init() {
     try {
         updateVisitCount();
         toggleSearchState(false);
 
-        // 先抓取最新一集顯示於主面板
+        // 第一階段：先抓取最新一集顯示
         const latestRes = await fetch('/api/episodes/latest');
         const latestEp = await latestRes.json();
         renderMain(latestEp);
@@ -42,7 +42,7 @@ async function init() {
 }
 
 /**
- * 造訪次數累計：使用 CounterAPI.dev (免資料庫)
+ * 造訪次數累計：使用 CounterAPI v2 介面
  */
 function updateVisitCount() {
     const workspace = "albertma2020s-team-3154";
@@ -52,14 +52,17 @@ function updateVisitCount() {
         .then(res => res.json())
         .then(data => {
             const countEl = document.getElementById('visit-count');
-            if (countEl && data.data.up_count) countEl.innerText = data.data.up_count.toLocaleString();
+            if (countEl && data.data.up_count) {
+                countEl.innerText = data.data.up_count.toLocaleString();
+            }
         })
         .catch(() => {
+            // 靜默處理
         });
 }
 
 /**
- * 控制搜尋組件狀態：載入完整歷史前暫時停用搜尋
+ * 控制搜尋組件狀態
  */
 function toggleSearchState(isEnabled) {
     const searchInput = document.getElementById('search-input');
@@ -98,7 +101,7 @@ async function loadFullHistory() {
 }
 
 /**
- * 載入並生成推薦關鍵字 Modal
+ * 載入推薦關鍵字 Modal
  */
 async function loadRecommendedKeywords() {
     try {
@@ -125,14 +128,20 @@ function selectKeyword(kw) {
 }
 
 /**
- * 重設播放器狀態
+ * 重設播放器狀態：修正回首頁時標題文字不正確的問題
  */
 function resetToInitial() {
     const input = document.getElementById('search-input');
     if (input) input.value = "";
+
     isSearchMode = false;
     currentKeyword = "";
     currentPage = 0;
+
+    // 修正：重設時將側邊欄標題改回全部集數
+    const label = document.getElementById('sidebar-label');
+    if (label) label.innerText = "📚 全部集數";
+
     if (allEpisodes.length > 0) {
         audio.pause();
         audio.currentTime = 0;
@@ -169,7 +178,7 @@ function renderMain(ep, keyword = "", jumpSec = -1) {
 }
 
 /**
- * 渲染側邊欄：包含 Tooltip 與搜尋段落顯示
+ * 渲染側邊欄
  */
 function renderSidebar() {
     const start = currentPage * itemsPerPage;
@@ -216,7 +225,7 @@ function changePage(delta) {
 }
 
 /**
- * 處理檢索：支援半形 | 與手機全形 ｜
+ * 處理檢索
  */
 function handleSearch(event) {
     if (event) event.preventDefault();
@@ -245,7 +254,7 @@ function handleSearch(event) {
 }
 
 /**
- * 高亮處理：支援聯集標記
+ * 高亮標記
  */
 function applyHighlight(text, kw) {
     if (!kw) return text;

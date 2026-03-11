@@ -16,6 +16,19 @@ function formatDuration(duration) {
 }
 
 /**
+ * 核心修正：清理章節標題，移除開頭的標點符號與空白
+ */
+function cleanChapterTitles(ep) {
+    if (ep && ep.chapters) {
+        ep.chapters.forEach(ch => {
+            // 使用 Regex 移除開頭的 、，,；; 或空白
+            ch.title = ch.title.replace(/^[、，,；;\s]+/, '').trim();
+        });
+    }
+    return ep;
+}
+
+/**
  * 初始化載入：統計造訪數、分段載入集數
  */
 async function init() {
@@ -25,7 +38,11 @@ async function init() {
 
         // 第一階段：先抓取最新一集顯示
         const latestRes = await fetch('/api/episodes/latest');
-        const latestEp = await latestRes.json();
+        let latestEp = await latestRes.json();
+
+        // 修正：清理最新一集的章節標題
+        latestEp = cleanChapterTitles(latestEp);
+
         renderMain(latestEp);
 
         document.getElementById('sidebar-list').innerHTML = `
@@ -87,6 +104,9 @@ async function loadFullHistory() {
         const res = await fetch('/api/episodes');
         allEpisodes = await res.json();
 
+        // 修正：清理所有歷史集數的章節標題
+        allEpisodes.forEach(ep => cleanChapterTitles(ep));
+
         if (!isSearchMode) {
             currentDisplayList = allEpisodes;
             renderSidebar();
@@ -128,7 +148,7 @@ function selectKeyword(kw) {
 }
 
 /**
- * 重設播放器狀態：修正回首頁時標題文字不正確的問題
+ * 重設播放器狀態
  */
 function resetToInitial() {
     const input = document.getElementById('search-input');
@@ -138,7 +158,6 @@ function resetToInitial() {
     currentKeyword = "";
     currentPage = 0;
 
-    // 修正：重設時將側邊欄標題改回全部集數
     const label = document.getElementById('sidebar-label');
     if (label) label.innerText = "📚 全部集數";
 
